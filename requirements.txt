@@ -1,1 +1,27 @@
--r backend/requirements.txt
+# ── FastAPI & Server ──
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+python-multipart>=0.0.6
+
+# ── AI / ML ──
+ultralytics>=8.0.0
+opencv-python>=4.8.0
+torch>=2.0.0
+lapx>=0.5.0
+
+# ── LangChain & LLM ──
+langchain>=0.2.0
+langchain-ollama>=0.1.0
+langchain-community>=0.2.0
+langgraph>=0.2.0
+
+# ── MCP (Model Context Protocol) ──
+mcp>=1.0.0
+
+# ── Database ──
+# sqlite3 is built-in
+
+# ── Utilities ──
+pydantic>=2.0.0
+imageio>=2.30.0
+imageio-ffmpeg>=0.4.0
