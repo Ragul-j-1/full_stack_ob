@@ -5,24 +5,26 @@
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
 <meta name="description" content="AquaVision — AI-powered underwater object detection and marine intelligence system"/>
 <title>AquaVision — Underwater Detection</title>
-<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet"/>
 <style>
 :root{
-  --bg:#04080f;
-  --surface:#080f1c;
-  --surface2:#0c1525;
-  --border:rgba(0,200,255,0.12);
-  --cyan:#00c8ff;
-  --teal:#00ffcc;
+  --bg:#05070a;
+  --surface:rgba(12,18,28,0.7);
+  --surface2:rgba(18,23,35,0.85);
+  --border:rgba(255,107,61,0.15);
+  --coral:#ff6b3d;
+  --coral-glow:rgba(255,107,61,0.4);
+  --cyan:#00f2ff;
+  --teal:#00ffaa;
   --green:#00ff88;
-  --amber:#ffb300;
   --red:#ff4b4b;
-  --purple:#9b6dff;
-  --text:#c8e0f0;
-  --dim:#3a5a70;
-  --font:'Syne',sans-serif;
-  --mono:'Space Mono',monospace;
+  --text:#e2e8f0;
+  --dim:#64748b;
+  --font:'Plus Jakarta Sans',sans-serif;
+  --header-font:'Bebas Neue',sans-serif;
+  --mono:'JetBrains Mono',monospace;
 }
+@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;700&display=swap');
+
 *{margin:0;padding:0;box-sizing:border-box}
 html{scroll-behavior:smooth}
 body{
@@ -31,604 +33,423 @@ body{
   color:var(--text);
   min-height:100vh;
   overflow-x:hidden;
+  line-height:1.6;
 }
 
-/* ── Ocean BG ── */
-body::before{
-  content:'';
+/* ── Caustics BG ── */
+.caustics{
   position:fixed;inset:0;z-index:0;
   background:
-    radial-gradient(ellipse 70% 60% at 10% 90%,rgba(0,200,255,0.05) 0%,transparent 60%),
-    radial-gradient(ellipse 50% 40% at 90% 10%,rgba(0,255,204,0.04) 0%,transparent 60%),
-    radial-gradient(ellipse 100% 100% at 50% 50%,#04080f 0%,#020610 100%);
+    radial-gradient(circle at 50% -20%,rgba(255,107,61,0.08),transparent 80%),
+    radial-gradient(circle at 80% 20%,rgba(0,242,255,0.03),transparent 50%);
   pointer-events:none;
+}
+#caustics-layer {
+  position: absolute; inset: 0;
+  background: linear-gradient(135deg, transparent 40%, rgba(255,107,61,0.05) 50%, transparent 60%);
+  background-size: 200% 200%;
+  animation: causticsMove 8s ease-in-out infinite;
+}
+@keyframes causticsMove{
+  0%,100%{background-position:0% 0%}
+  50%{background-position:100% 100%}
 }
 
 /* ── Bubbles ── */
-#bubbles{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden}
+#bubbles{position:fixed;inset:0;z-index:1;pointer-events:none;overflow:hidden}
 .bbl{
   position:absolute;bottom:-30px;border-radius:50%;
-  background:radial-gradient(circle at 30% 30%,rgba(0,200,255,0.35),rgba(0,200,255,0.04));
-  border:1px solid rgba(0,200,255,0.18);
+  background:radial-gradient(circle at 30% 30%,rgba(255,107,61,0.2),rgba(255,107,61,0.02));
+  border:1px solid rgba(255,107,61,0.1);
   animation:rise linear infinite;
 }
 @keyframes rise{
-  0%  {transform:translateY(0) translateX(0);opacity:.5}
-  50% {transform:translateY(-50vh) translateX(15px);opacity:.2}
-  100%{transform:translateY(-110vh) translateX(-8px);opacity:0}
+  0%  {transform:translateY(0) translateX(0);opacity:.4}
+  50% {transform:translateY(-50vh) translateX(20px);opacity:.2}
+  100%{transform:translateY(-110vh) translateX(-10px);opacity:0}
 }
 
 /* ── Layout ── */
-#app{position:relative;z-index:1;display:flex;flex-direction:column;min-height:100vh}
+#app{position:relative;z-index:2;display:flex;flex-direction:column;min-height:100vh}
 
 /* ── Header ── */
 header{
-  padding:18px 32px;
+  padding:24px 40px;
   display:flex;align-items:center;justify-content:space-between;
-  background:rgba(4,8,15,0.85);
+  background:rgba(5,8,15,0.7);
   border-bottom:1px solid var(--border);
-  backdrop-filter:blur(16px);
+  backdrop-filter:blur(24px);
   position:sticky;top:0;z-index:100;
 }
-.logo{display:flex;align-items:center;gap:14px}
-.logo-icon{font-size:26px;filter:drop-shadow(0 0 12px var(--cyan))}
+.logo{display:flex;align-items:center;gap:16px}
+.logo-icon{font-size:32px;filter:drop-shadow(0 0 15px var(--coral))}
 .logo-text h1{
-  font-size:18px;font-weight:800;letter-spacing:4px;
-  background:linear-gradient(90deg,var(--cyan),var(--teal));
-  -webkit-background-clip:text;
-  background-clip:text;
-  -webkit-text-fill-color:transparent;
+  font-family:var(--header-font);
+  font-size:32px;font-weight:400;letter-spacing:3px;
+  color:var(--coral);line-height:1;
 }
-.logo-text span{font-size:10px;color:var(--dim);letter-spacing:2px;font-family:var(--mono)}
+.logo-text span{font-size:10px;color:var(--dim);letter-spacing:4px;text-transform:uppercase;font-weight:700}
 
-nav{display:flex;gap:4px;flex-wrap:wrap}
+nav{display:flex;gap:12px}
 .nav-btn{
-  padding:7px 16px;border-radius:20px;border:1px solid var(--border);
+  padding:8px 24px;border-radius:6px;border:1px solid transparent;
   background:transparent;color:var(--dim);cursor:pointer;
-  font-family:var(--font);font-size:12px;font-weight:600;
-  letter-spacing:1px;transition:all .2s;
+  font-family:var(--header-font);font-size:16px;letter-spacing:1.5px;
+  transition:all .3s cubic-bezier(0.4,0,0.2,1);
 }
 .nav-btn:hover,.nav-btn.active{
-  border-color:var(--cyan);color:var(--cyan);
-  background:rgba(0,200,255,0.08);
-  box-shadow:0 0 14px rgba(0,200,255,0.12);
+  color:var(--coral);
+  background:rgba(255,107,61,0.08);
+  border-color:rgba(255,107,61,0.3);
+  box-shadow:0 0 20px rgba(255,107,61,0.05);
 }
 
 /* ── Main ── */
-main{flex:1;padding:28px 32px;max-width:1400px;margin:0 auto;width:100%}
+main{flex:1;padding:40px;max-width:1440px;margin:0 auto;width:100%}
 
 /* ── Panels ── */
-.panel{display:none;animation:fadeUp .35s ease}
+.panel{display:none;animation:panelSwim .5s cubic-bezier(0.2,0.8,0.2,1)}
 .panel.active{display:block}
-@keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+@keyframes panelSwim{from{opacity:0;transform:translateY(30px) scale(0.98)}to{opacity:1;transform:translateY(0) scale(1)}}
 
 /* ── Section title ── */
 .sec-title{
-  font-size:11px;font-weight:700;letter-spacing:3px;
-  color:var(--cyan);text-transform:uppercase;
-  display:flex;align-items:center;gap:10px;margin-bottom:20px;
+  font-family:var(--header-font);
+  font-size:24px;letter-spacing:2px;
+  color:var(--coral);text-transform:uppercase;
+  display:flex;align-items:center;gap:14px;margin-bottom:32px;
 }
-.sec-title::after{content:'';flex:1;height:1px;background:linear-gradient(90deg,var(--border),transparent)}
+.sec-title::before{content:'';width:4px;height:24px;background:var(--coral);border-radius:2px}
 
-/* ── Card ── */
+/* ── Glass Cards ── */
 .card{
   background:var(--surface);
   border:1px solid var(--border);
-  border-radius:16px;
-  padding:22px;
+  border-radius:12px;
+  padding:28px;
+  backdrop-filter:blur(16px);
+  position:relative;overflow:hidden;
+  transition:transform .3s, border-color .3s;
 }
+.card:hover{border-color:rgba(255,107,61,0.4)}
+.card::before{
+  content:'';position:absolute;top:0;left:-100%;width:100%;height:100%;
+  background:linear-gradient(90deg,transparent,rgba(255,107,61,0.03),transparent);
+  transition:left 0.7s ease;
+}
+.card:hover::before{left:100%}
 
-/* ═══════════════ DASHBOARD ═══════════════ */
-.stats-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:20px}
-.stat{
-  background:var(--surface);border:1px solid var(--border);
-  border-radius:14px;padding:18px 14px;text-align:center;
-  position:relative;overflow:hidden;transition:transform .2s,box-shadow .2s;
+/* ═══════════════ BENTO DASHBOARD ═══════════════ */
+.bento-grid{
+  display:grid;grid-template-columns:repeat(4,1fr);
+  grid-template-rows:auto auto;
+  gap:20px;margin-bottom:32px;
 }
-.stat:hover{transform:translateY(-3px);box-shadow:0 8px 28px rgba(0,200,255,0.08)}
-.stat::before{
-  content:'';position:absolute;inset:0;
-  background:radial-gradient(circle at 50% 0%,rgba(0,200,255,0.05),transparent 70%);
+@media(max-width:1100px){.bento-grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:600px){.bento-grid{grid-template-columns:1fr}}
+
+.bento-stat{
+  display:flex;flex-direction:column;justify-content:center;
+  min-height:140px;
 }
+.stat-main{grid-column:span 2;grid-row:span 2}
 .stat-val{
-  font-family:var(--mono);font-size:28px;font-weight:700;
-  color:var(--cyan);display:block;margin-bottom:6px;
+  font-family:var(--mono);font-size:48px;font-weight:700;
+  color:var(--coral);line-height:1;margin-bottom:8px;
+  filter:drop-shadow(0 0 10px var(--coral-glow));
 }
-.stat-lbl{font-size:10px;color:var(--dim);letter-spacing:1.5px;text-transform:uppercase}
+.stat-lbl{font-weight:700;font-size:12px;color:var(--dim);text-transform:uppercase;letter-spacing:2px}
 
-.two-col{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}
-@media(max-width:700px){.two-col{grid-template-columns:1fr}}
+.metric-row{display:flex;gap:24px;margin-bottom:24px}
+.metric{flex:1;background:rgba(255,255,255,0.02);padding:16px;border-radius:8px;border-left:2px solid var(--coral)}
+.metric-val{display:block;font-size:18px;font-weight:700;color:var(--text)}
+.metric-lbl{font-size:10px;text-transform:uppercase;color:var(--dim);letter-spacing:1px}
 
 /* Bar chart */
-.bar-row{margin-bottom:10px}
-.bar-meta{display:flex;justify-content:space-between;font-size:11px;margin-bottom:4px}
-.bar-meta span:first-child{color:var(--text);text-transform:capitalize}
-.bar-meta span:last-child{color:var(--dim);font-family:var(--mono)}
-.bar-track{height:7px;border-radius:4px;background:rgba(0,200,255,0.07);border:1px solid rgba(0,200,255,0.08);overflow:hidden}
-.bar-fill{height:100%;border-radius:4px;background:linear-gradient(90deg,var(--teal),var(--cyan));transition:width 1.2s cubic-bezier(.4,0,.2,1)}
-
-/* Environment badge */
-.env-badge{
-  display:inline-flex;align-items:center;gap:8px;
-  padding:8px 18px;border-radius:20px;
-  background:rgba(0,255,204,0.08);border:1px solid rgba(0,255,204,0.2);
-  color:var(--teal);font-size:13px;font-weight:600;margin-top:12px;
-}
-
-/* Activity pills */
-.pill-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
-.pill{
-  padding:5px 14px;border-radius:20px;font-size:11px;font-weight:700;
-  letter-spacing:.5px;
-}
-.pill-fast{background:rgba(255,75,75,0.1);border:1px solid rgba(255,75,75,0.25);color:var(--red)}
-.pill-normal{background:rgba(0,200,255,0.08);border:1px solid rgba(0,200,255,0.2);color:var(--cyan)}
-.pill-stat{background:rgba(0,255,136,0.08);border:1px solid rgba(0,255,136,0.2);color:var(--green)}
-.pill-unk{background:rgba(58,90,112,0.2);border:1px solid rgba(58,90,112,0.3);color:var(--dim)}
+.bar-chart-wrap{display:flex;flex-direction:column;gap:14px}
+.bar-row{margin-bottom:4px}
+.bar-meta{display:flex;justify-content:space-between;font-size:12px;margin-bottom:6px;font-weight:500}
+.bar-track{height:6px;border-radius:3px;background:rgba(255,107,61,0.05);overflow:hidden}
+.bar-fill{height:100%;border-radius:3px;background:var(--coral);box-shadow:0 0 12px var(--coral-glow);transition:width 1.5s cubic-bezier(0.2,0.8,0.2,1)}
 
 /* ═══════════════ UPLOAD / DETECT ═══════════════ */
 .upload-zone{
-  border:2px dashed var(--border);border-radius:18px;
-  padding:56px 32px;text-align:center;cursor:pointer;
-  transition:all .3s;background:rgba(0,200,255,0.02);
-  position:relative;overflow:hidden;
+  border:2px dashed var(--border);border-radius:12px;
+  padding:72px 40px;text-align:center;cursor:pointer;
+  transition:all .3s;background:rgba(255,107,61,0.02);
 }
-.upload-zone:hover,.upload-zone.over{
-  border-color:var(--cyan);background:rgba(0,200,255,0.05);
-  box-shadow:0 0 40px rgba(0,200,255,0.08) inset;
-}
-.upload-icon{font-size:52px;display:block;margin-bottom:14px;filter:drop-shadow(0 0 14px rgba(0,200,255,0.5))}
-.upload-zone h3{font-size:18px;font-weight:700;margin-bottom:8px}
-.upload-zone p{color:var(--dim);font-size:12px}
-.upload-zone input{display:none}
+.upload-zone:hover{border-color:var(--coral);background:rgba(255,107,61,0.05)}
+.upload-icon{font-size:64px;display:block;margin-bottom:20px;filter:drop-shadow(0 0 20px var(--coral-glow))}
 
 .btn{
-  display:inline-flex;align-items:center;gap:8px;
-  padding:11px 26px;border-radius:28px;border:none;cursor:pointer;
-  font-family:var(--font);font-size:13px;font-weight:700;
-  letter-spacing:.5px;transition:all .2s;
+  display:inline-flex;align-items:center;justify-content:center;gap:12px;
+  padding:14px 40px;border-radius:8px;border:none;cursor:pointer;
+  font-family:var(--header-font);font-size:18px;letter-spacing:1px;
+  text-transform:uppercase;transition:all .3s cubic-bezier(0.4,0,0.2,1);
 }
 .btn-primary{
-  background:linear-gradient(135deg,#007a9e,var(--cyan));
-  color:#000;box-shadow:0 4px 20px rgba(0,200,255,0.25);
+  background:var(--coral);color:#000;
+  box-shadow:0 8px 24px rgba(255,107,61,0.2);
 }
-.btn-primary:hover{transform:translateY(-2px);box-shadow:0 6px 28px rgba(0,200,255,0.35)}
-.btn-primary:disabled{opacity:.5;cursor:not-allowed;transform:none}
-.btn-danger{background:linear-gradient(135deg,#7a0000,var(--red));color:#fff}
-.btn-ghost{background:var(--surface2);border:1px solid var(--border);color:var(--text)}
-.btn-ghost:hover{border-color:var(--cyan);color:var(--cyan)}
+.btn-primary:hover{transform:translateY(-3px);box-shadow:0 12px 32px rgba(255,107,61,0.35)}
+.btn-ghost{background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.1);color:var(--text)}
+.btn-ghost:hover{border-color:var(--coral);color:var(--coral);background:rgba(255,107,61,0.05)}
 
 /* Progress */
-.prog-wrap{display:none;margin-top:20px}
-.prog-wrap.show{display:block}
-.prog-meta{display:flex;justify-content:space-between;font-size:12px;margin-bottom:8px}
-.prog-track{height:9px;border-radius:5px;background:rgba(0,200,255,0.07);border:1px solid rgba(0,200,255,0.1);overflow:hidden}
-.prog-fill{
-  height:100%;border-radius:5px;
-  background:linear-gradient(90deg,var(--teal),var(--cyan),var(--green));
-  background-size:200%;
-  animation:shimmer 2s linear infinite,grow .5s ease;
-  transition:width .4s ease;
-}
-@keyframes shimmer{0%{background-position:200%}100%{background-position:-200%}}
+.prog-fill{background:var(--coral);box-shadow:0 0 15px var(--coral-glow)}
 
-.badge{display:inline-block;padding:4px 12px;border-radius:10px;font-size:10px;font-weight:700;letter-spacing:1px;margin-top:8px}
-.badge-run{background:rgba(255,179,0,.12);color:var(--amber);border:1px solid rgba(255,179,0,.25)}
-.badge-done{background:rgba(0,255,136,.1);color:var(--green);border:1px solid rgba(0,255,136,.25)}
-.badge-err{background:rgba(255,75,75,.1);color:var(--red);border:1px solid rgba(255,75,75,.25)}
-.badge-idle{background:rgba(58,90,112,.15);color:var(--dim);border:1px solid rgba(58,90,112,.25)}
-
-/* Video compare */
-.vid-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:16px}
-@media(max-width:680px){.vid-grid{grid-template-columns:1fr}}
-.vid-wrap{border-radius:12px;overflow:hidden;border:1px solid var(--border);background:#000}
-.vid-wrap video{width:100%;display:block;max-height:280px;object-fit:contain}
-.vid-error{
-  position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
-  background:rgba(0,0,0,0.8);color:var(--red);font-size:11px;text-align:center;padding:20px;z-index:5;
-}
-.vid-label{padding:9px 14px;font-size:10px;letter-spacing:2px;color:var(--dim);text-transform:uppercase;background:rgba(0,0,0,.5);font-family:var(--mono)}
-
-/* Object pills */
-.obj-pills{display:flex;flex-wrap:wrap;gap:7px;margin-top:14px}
-.obj-pill{
-  padding:5px 13px;border-radius:16px;font-size:11px;font-weight:700;
-  background:rgba(0,200,255,0.07);border:1px solid rgba(0,200,255,0.18);color:var(--cyan);
-  display:flex;align-items:center;gap:6px;
-}
-.obj-pill-cnt{background:rgba(0,200,255,0.18);border-radius:8px;padding:1px 6px;font-size:10px;font-family:var(--mono)}
+.badge{padding:6px 14px;border-radius:4px;font-family:var(--mono);font-size:11px;font-weight:700}
+.badge-run{background:rgba(255,107,61,0.15);color:var(--coral);border:1px solid var(--border)}
 
 /* ═══════════════ CHATBOT ═══════════════ */
-.chat-layout{display:grid;grid-template-columns:1fr 260px;gap:14px;height:68vh}
-@media(max-width:860px){.chat-layout{grid-template-columns:1fr;height:auto}}
-.chat-main{display:flex;flex-direction:column}
+.chat-layout{display:grid;grid-template-columns:1fr 300px;gap:24px;height:72vh}
+.chat-main{display:flex;flex-direction:column;border:1px solid var(--border)}
 .chat-msgs{
-  flex:1;overflow-y:auto;padding:18px;
-  display:flex;flex-direction:column;gap:14px;
-  background:rgba(4,8,15,.6);
-  border-radius:14px 14px 0 0;
-  border:1px solid var(--border);border-bottom:none;
-  scrollbar-width:thin;scrollbar-color:var(--border) transparent;
-  min-height:300px;
+  flex:1;overflow-y:auto;padding:24px;display:flex;flex-direction:column;gap:20px;
+  background:rgba(5,8,15,0.4);
 }
-.chat-msgs::-webkit-scrollbar{width:3px}
-.chat-msgs::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
-
-.msg{display:flex;gap:10px;max-width:88%;animation:msgIn .3s ease}
-@keyframes msgIn{from{opacity:0;transform:translateY(7px)}to{opacity:1;transform:translateY(0)}}
-.msg.user{align-self:flex-end;flex-direction:row-reverse}
-.msg-av{
-  width:32px;height:32px;border-radius:50%;flex-shrink:0;
-  display:flex;align-items:center;justify-content:center;font-size:15px;
-  border:1px solid var(--border);
-}
-.msg.bot .msg-av{background:rgba(0,200,255,.08);border-color:rgba(0,200,255,.25)}
-.msg.user .msg-av{background:rgba(0,255,204,.08);border-color:rgba(0,255,204,.25)}
 .msg-bbl{
-  padding:11px 15px;border-radius:13px;
-  font-size:13px;line-height:1.7;white-space:pre-wrap;word-break:break-word;
+  padding:16px 20px;border-radius:12px;font-size:14px;line-height:1.6;background:var(--surface2);border:1px solid var(--border);
 }
-.msg.bot  .msg-bbl{background:var(--surface);border:1px solid var(--border);border-radius:4px 13px 13px 13px}
-.msg.user .msg-bbl{background:rgba(0,255,204,.08);border:1px solid rgba(0,255,204,.15);border-radius:13px 4px 13px 13px}
+.msg.user .msg-bbl{background:rgba(255,107,61,0.1);border-color:var(--coral)}
 
-.typing{display:flex;gap:5px;padding:3px 0}
-.dot{width:7px;height:7px;border-radius:50%;background:var(--dim);animation:bop 1.4s infinite}
-.dot:nth-child(2){animation-delay:.2s}
-.dot:nth-child(3){animation-delay:.4s}
-@keyframes bop{0%,60%,100%{transform:translateY(0)}30%{transform:translateY(-7px)}}
-
-.chat-input-bar{
-  display:flex;gap:9px;padding:12px;
-  background:rgba(4,8,15,.85);
-  border:1px solid var(--border);border-top:none;
-  border-radius:0 0 14px 14px;
-}
+.chat-input-bar{padding:20px;background:var(--surface2);border-top:1px solid var(--border);display:flex;gap:16px}
 .chat-inp{
-  flex:1;background:rgba(0,200,255,.04);border:1px solid var(--border);
-  border-radius:22px;padding:9px 16px;color:var(--text);
-  font-family:var(--font);font-size:13px;outline:none;transition:border-color .2s;
+  flex:1;background:rgba(0,0,0,0.2);border:1px solid var(--border);
+  padding:12px 20px;border-radius:6px;font-size:14px;color:var(--text);
 }
-.chat-inp:focus{border-color:rgba(0,200,255,.35)}
-.chat-inp::placeholder{color:var(--dim)}
-.chat-send{
-  width:40px;height:40px;border-radius:50%;border:none;cursor:pointer;
-  background:linear-gradient(135deg,#007a9e,var(--cyan));
-  font-size:17px;display:flex;align-items:center;justify-content:center;
-  transition:all .2s;box-shadow:0 2px 12px rgba(0,200,255,.25);
-  color:#000;
-}
-.chat-send:hover{transform:scale(1.08);box-shadow:0 4px 18px rgba(0,200,255,.4)}
 
-.chat-side{display:flex;flex-direction:column;gap:8px}
 .prompt-card{
-  background:var(--surface);border:1px solid var(--border);
-  border-radius:11px;padding:11px;cursor:pointer;transition:all .2s;
-  font-size:11px;color:var(--dim);line-height:1.6;
+  background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.05);
+  margin-bottom:12px;padding:14px;border-radius:8px;font-size:12px;cursor:pointer;
 }
-.prompt-card:hover{border-color:rgba(0,200,255,.28);color:var(--cyan);background:rgba(0,200,255,.04)}
-.prompt-card strong{display:block;color:var(--text);font-size:10px;letter-spacing:1px;text-transform:uppercase;margin-bottom:4px}
+.prompt-card:hover{border-color:var(--coral);background:rgba(255,107,61,0.04)}
+.prompt-card strong{color:var(--coral);font-family:var(--header-font);font-size:14px;letter-spacing:1px;display:block}
 
 /* ── Toast ── */
 #toast{
-  position:fixed;bottom:22px;right:22px;z-index:999;
-  padding:11px 18px;border-radius:10px;font-size:12px;
-  background:rgba(0,255,136,.1);border:1px solid rgba(0,255,136,.25);color:var(--green);
-  transform:translateY(70px);opacity:0;transition:all .3s;pointer-events:none;
+  position:fixed;bottom:40px;left:50%;transform:translateX(-50%) translateY(100px);
+  background:rgba(12,18,28,0.9);border:1px solid var(--coral);color:var(--coral);
+  font-family:var(--header-font);letter-spacing:1.5px;padding:16px 32px;
+  border-radius:8px;z-index:1000;opacity:0;transition:all .4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
-#toast.show{transform:translateY(0);opacity:1}
-#toast.err{background:rgba(255,75,75,.1);border-color:rgba(255,75,75,.25);color:var(--red)}
-
-/* ── Empty state ── */
-.empty{text-align:center;padding:32px;color:var(--dim);font-size:13px}
-.empty span{font-size:32px;display:block;margin-bottom:10px}
-
-/* ── Predict button ── */
-.predict-btn-wrap{margin-top:14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
-
-/* ── Image results ── */
-.img-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:16px}
-@media(max-width:680px){.img-grid{grid-template-columns:1fr}}
-.img-wrap{border-radius:12px;overflow:hidden;border:1px solid var(--border);background:#000}
-.img-wrap img{width:100%;display:block;max-height:400px;object-fit:contain}
-.img-label{padding:9px 14px;font-size:10px;letter-spacing:2px;color:var(--dim);text-transform:uppercase;background:rgba(0,0,0,.5);font-family:var(--mono)}
-
-/* ── File type badge ── */
-.file-type-badge{
-  display:inline-flex;align-items:center;gap:6px;
-  padding:4px 12px;border-radius:10px;font-size:10px;font-weight:700;
-  letter-spacing:1px;margin-left:8px;
-}
-.file-type-badge.img{background:rgba(155,109,255,.12);color:var(--purple);border:1px solid rgba(155,109,255,.25)}
-.file-type-badge.vid{background:rgba(0,200,255,.08);color:var(--cyan);border:1px solid rgba(0,200,255,.2)}
+#toast.show{transform:translateX(-50%) translateY(0);opacity:1}
+#toast.err{border-color:var(--red);color:var(--red)}
 </style>
 </head>
 <body>
+  <div class="caustics"><div id="caustics-layer"></div></div>
+  <div id="bubbles"></div>
 
-<div id="bubbles"></div>
-
-<div id="app">
-  <!-- Header -->
-  <header>
-    <div class="logo">
-      <span class="logo-icon">🌊</span>
-      <div class="logo-text">
-        <h1>AQUAVISION</h1>
-        <span>UNDERWATER DETECTION SYSTEM</span>
-      </div>
-    </div>
-    <nav>
-      <button class="nav-btn active" id="nav-dashboard" onclick="showPanel('dashboard',this)">Dashboard</button>
-      <button class="nav-btn" id="nav-detect" onclick="showPanel('detect',this)">Detect</button>
-      <button class="nav-btn" id="nav-chat" onclick="showPanel('chat',this)">AquaBot</button>
-    </nav>
-  </header>
-
-  <main>
-
-    <!-- ═══ DASHBOARD ═══ -->
-    <div class="panel active" id="panel-dashboard">
-      <div class="sec-title">🌊 Overview</div>
-
-      <div class="stats-row">
-        <div class="stat">
-          <span class="stat-val" id="s-total">—</span>
-          <span class="stat-lbl">Total Detections</span>
-        </div>
-        <div class="stat">
-          <span class="stat-val" id="s-unique">—</span>
-          <span class="stat-lbl">Unique Objects</span>
-        </div>
-        <div class="stat">
-          <span class="stat-val" id="s-status" style="color:var(--green)">LIVE</span>
-          <span class="stat-lbl">System Status</span>
-        </div>
-        <div class="stat">
-          <span class="stat-val" id="s-env" style="font-size:16px">—</span>
-          <span class="stat-lbl">Environment</span>
+  <div id="app">
+    <header>
+      <div class="logo">
+        <span class="logo-icon">🌊</span>
+        <div class="logo-text">
+          <h1>AQUAVISION</h1>
+          <span>Maritime Intelligence Console</span>
         </div>
       </div>
+      <nav>
+        <button class="nav-btn active" id="nav-dash" onclick="showPanel('dash',this)">Dashboard</button>
+        <button class="nav-btn" id="nav-detect" onclick="showPanel('detect',this)">Detect</button>
+        <button class="nav-btn" id="nav-bot" onclick="showPanel('bot',this)">AquaBot</button>
+      </nav>
+    </header>
 
-      <div class="two-col">
-        <div class="card">
-          <div class="sec-title">Top Detected Objects</div>
-          <div id="top-chart">
-            <div class="empty"><span>📊</span>Run detection to see data</div>
-          </div>
-        </div>
-        <div class="card">
-          <div class="sec-title">Activity Breakdown</div>
-          <div id="activity-pills">
-            <div class="empty"><span>🏃</span>No activity data yet</div>
-          </div>
-          <div class="predict-btn-wrap">
-            <button class="btn btn-ghost" id="predictEnvBtn" onclick="predictEnvironment()">🌍 Predict Environment</button>
-            <span id="predictResult" style="font-size:12px;color:var(--teal)"></span>
-          </div>
-        </div>
-      </div>
-
-      <div class="card" style="text-align:center;padding:36px">
-        <div style="font-size:52px;margin-bottom:14px;filter:drop-shadow(0 0 16px var(--cyan))">🐠</div>
-        <h2 style="font-size:17px;font-weight:800;color:var(--cyan);margin-bottom:8px;letter-spacing:2px">READY TO DIVE</h2>
-        <p style="color:var(--dim);font-size:13px;margin-bottom:20px">Upload an underwater video and let AI detect every creature</p>
-        <button class="btn btn-primary" id="goto-detect-btn" onclick="showPanel('detect',document.getElementById('nav-detect'))">
-          🎬 Upload & Detect
-        </button>
-      </div>
-    </div>
-
-    <!-- ═══ DETECT ═══ -->
-    <div class="panel" id="panel-detect">
-      <div class="sec-title">🎬 Upload & Detect</div>
-
-      <div class="card" style="margin-bottom:14px">
-        <div class="upload-zone" id="uploadZone">
-          <input type="file" id="fileInput" accept="image/*,video/*"/>
-          <span class="upload-icon">📁</span>
-          <h3>Drop your image or video here</h3>
-          <p style="margin-bottom:6px">Images: JPG · PNG · WEBP &nbsp;|&nbsp; Videos: MP4 · AVI · MOV · MKV</p>
-          <p style="margin-bottom:18px;font-size:11px;color:var(--dim)">YOLO detects objects → stored in DB → accessible via AquaBot (RAG)</p>
-          <button class="btn btn-primary" id="browse-btn" onclick="document.getElementById('fileInput').click()">📂 Browse Files</button>
-        </div>
-
-        <!-- Upload progress -->
-        <div class="prog-wrap" id="uploadProg">
-          <div class="prog-meta">
-            <span id="uploadText">Uploading...</span>
-            <span id="uploadPct">0%</span>
-          </div>
-          <div class="prog-track"><div class="prog-fill" id="uploadFill" style="width:0%"></div></div>
-        </div>
-
-        <!-- Detect button -->
-        <div id="detectBtnWrap" style="display:none;margin-top:16px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-          <button class="btn btn-primary" id="detectBtn" onclick="startDetection()">🔍 Start Detection</button>
-          <span class="badge badge-idle" id="detectBadge">IDLE</span>
-          <span id="fileTypeBadge"></span>
-          <span style="font-size:12px;color:var(--dim)" id="detectMsg"></span>
-        </div>
-      </div>
-
-      <!-- Detection progress -->
-      <div class="prog-wrap card" id="detectProg" style="margin-bottom:14px">
-        <div class="sec-title">Processing</div>
-        <div class="prog-meta">
-          <span id="detectText">Running YOLO detection...</span>
-          <span id="detectPct"></span>
-        </div>
-        <div class="prog-track"><div class="prog-fill" style="width:100%"></div></div>
-        <span class="badge badge-run">PROCESSING</span>
-      </div>
-
-      <!-- Video Results -->
-      <div class="card" id="resultsBox" style="display:none">
-        <div class="sec-title">✅ Detection Complete</div>
-        <div class="vid-grid">
-          <div class="vid-wrap" style="position:relative">
-            <div class="vid-label">Original</div>
-            <video id="origVid" controls></video>
-            <div id="origVidErr" class="vid-error" style="display:none">
-              <span>⚠️ Format not supported by browser</span>
-              <p style="font-size:9px;margin-top:5px;color:var(--dim)">Codec mismatch or unsupported container</p>
+    <main>
+      <!-- ═══ DASHBOARD ═══ -->
+      <div class="panel active" id="panel-dash">
+        <div class="sec-title">Operational Overview</div>
+        
+        <div class="bento-grid">
+          <div class="card bento-stat stat-main">
+            <span class="stat-lbl">Active Maritime Detections</span>
+            <span class="stat-val" id="count-total">0</span>
+            <div class="metric-row">
+              <div class="metric">
+                <span class="metric-lbl">Top Object</span>
+                <span class="metric-val" id="top-obj-name">-</span>
+              </div>
+              <div class="metric">
+                <span class="metric-lbl">Environment</span>
+                <span class="metric-val" id="env-text">Unknown</span>
+              </div>
             </div>
+            <button class="btn btn-ghost" id="runPredictBtn" onclick="predictEnvironment()">🌍 Scan Environment</button>
           </div>
-          <div class="vid-wrap" style="position:relative">
-            <div class="vid-label">🐠 Detected Objects</div>
-            <video id="outVid" controls></video>
-            <div id="outVidErr" class="vid-error" style="display:none">
-              <span>⚠️ Browser cannot play this codec</span>
-              <p style="font-size:9px;margin-top:5px;color:var(--dim)">Try the Download button below to view in VLC</p>
+          
+          <div class="card bento-stat">
+            <span class="stat-lbl">Total Media</span>
+            <span class="stat-val" id="count-videos">0</span>
+            <span class="metric-lbl" style="margin-top:4px">Videos Processed</span>
+          </div>
+
+          <div class="card bento-stat">
+            <span class="stat-lbl">System Status</span>
+            <div style="display:flex;align-items:center;gap:10px;margin-top:12px">
+              <div style="width:12px;height:12px;border-radius:50%;background:var(--green);box-shadow:0 0 10px var(--green)"></div>
+              <span class="badge badge-run">Online / Live</span>
             </div>
           </div>
         </div>
-        <div style="margin-top:16px">
-          <div style="font-size:10px;color:var(--dim);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:10px">Objects Found</div>
-          <div class="obj-pills" id="objPills"></div>
-        </div>
-        <div style="margin-top:16px;display:flex;gap:10px;flex-wrap:wrap">
-          <a class="btn btn-primary" id="downloadBtn" href="#" download>⬇️ Download</a>
-          <button class="btn btn-ghost" id="ask-aquabot-btn" onclick="showPanel('chat',document.getElementById('nav-chat'))">🤖 Ask AquaBot</button>
-        </div>
-      </div>
 
-      <!-- Image Results -->
-      <div class="card" id="imageResultsBox" style="display:none">
-        <div class="sec-title">✅ Image Detection Complete</div>
-        <div class="img-grid">
-          <div class="img-wrap">
-            <div class="img-label">Original</div>
-            <img id="origImg" src="" alt="Original image"/>
-          </div>
-          <div class="img-wrap">
-            <div class="img-label">🐠 Detected Objects</div>
-            <img id="outImg" src="" alt="Detected objects"/>
-          </div>
-        </div>
-        <div style="margin-top:16px">
-          <div style="font-size:10px;color:var(--dim);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:10px">Objects Found</div>
-          <div class="obj-pills" id="imgObjPills"></div>
-        </div>
-        <div style="margin-top:16px;display:flex;gap:10px;flex-wrap:wrap">
-          <a class="btn btn-primary" id="imgDownloadBtn" href="#" download>⬇️ Download</a>
-          <button class="btn btn-ghost" onclick="showPanel('chat',document.getElementById('nav-chat'))">🤖 Ask AquaBot about this</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- ═══ CHAT ═══ -->
-    <div class="panel" id="panel-chat">
-      <div class="sec-title">🤖 AquaBot — AI Assistant</div>
-      <div class="chat-layout">
-        <div class="chat-main card" style="padding:0">
-          <div class="chat-msgs" id="chatMsgs">
-            <div class="msg bot">
-              <div class="msg-av">🐠</div>
-              <div class="msg-bbl">Hello explorer! 🌊 I'm <strong>AquaBot</strong>, your underwater intelligence assistant.
-
-I can answer questions about everything detected in your videos — species counts, activities, speed, and more.
-
-Try asking: <em>"What objects were detected?"</em> or <em>"How many divers were found?"</em></div>
+        <div style="display:grid;grid-template-columns:1.5fr 1fr;gap:20px;margin-bottom:32px">
+          <div class="card">
+            <div class="sec-title">Species Distribution</div>
+            <div id="top-chart" class="bar-chart-wrap">
+              <div style="text-align:center;padding:40px;color:var(--dim)">📊 Detection data required</div>
             </div>
           </div>
-          <div class="chat-input-bar">
-            <input class="chat-inp" id="chatInp" placeholder="Ask about your detections..."
-              onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMsg()}"/>
-            <button class="chat-send" id="chatSendBtn" onclick="sendMsg()">➤</button>
-          </div>
-        </div>
-
-        <div class="chat-side">
-          <div style="font-size:10px;letter-spacing:1.5px;color:var(--dim);text-transform:uppercase;padding:4px 0 6px">Quick Questions</div>
-          <div class="prompt-card" onclick="setQ(this.dataset.q)" data-q="What objects were detected in the video?">
-            <strong>All Objects</strong>What was detected?
-          </div>
-          <div class="prompt-card" onclick="setQ(this.dataset.q)" data-q="How many total detections are there?">
-            <strong>Count</strong>Total detections?
-          </div>
-          <div class="prompt-card" onclick="setQ(this.dataset.q)" data-q="What was the most common object detected?">
-            <strong>Top Object</strong>Most common object?
-          </div>
-          <div class="prompt-card" onclick="setQ(this.dataset.q)" data-q="How many objects were moving fast?">
-            <strong>Fast Movement</strong>Fast moving objects?
-          </div>
-          <div class="prompt-card" onclick="setQ(this.dataset.q)" data-q="What is the predicted environment of the video?">
-            <strong>Environment</strong>Where was this filmed?
-          </div>
-          <div class="prompt-card" onclick="setQ(this.dataset.q)" data-q="Show me all unique species detected">
-            <strong>Species</strong>All unique species?
-          </div>
-          <div class="prompt-card" onclick="setQ(this.dataset.q)" data-q="Which objects were stationary?">
-            <strong>Stationary</strong>Non-moving objects?
+          <div class="card">
+            <div class="sec-title">Motion Patterns</div>
+            <div id="activity-pills">
+               <div style="text-align:center;padding:40px;color:var(--dim)">🏃 No activity trends</div>
+            </div>
           </div>
         </div>
       </div>
-    </div>
 
-  </main>
-</div>
+      <!-- ═══ DETECT ═══ -->
+      <div class="panel" id="panel-detect">
+        <div class="sec-title">🎬 Mission Control — Detection</div>
 
-<div id="toast"></div>
+        <div class="card" style="margin-bottom:24px">
+          <div class="upload-zone" id="uploadZone">
+            <input type="file" id="fileInput" accept="video/*" style="display:none"/>
+            <span class="upload-icon">🎬</span>
+            <h3>DEEP SCAN INITIALIZATION</h3>
+            <p style="margin-bottom:18px; color:var(--dim)">MP4 · AVI · MOV · MKV · WEBM</p>
+            <button class="btn btn-primary">📂 SELECT SOURCE</button>
+          </div>
+
+          <div class="prog-wrap" id="uploadProg" style="display:none; margin-top:20px">
+            <div class="prog-meta" style="display:flex; justify-content:space-between; margin-bottom:8px; font-size:12px">
+              <span id="uploadText">Uploading...</span>
+              <span id="uploadPct">0%</span>
+            </div>
+            <div class="prog-track" style="height:6px; background:rgba(255,255,255,0.05); border-radius:3px; overflow:hidden">
+              <div class="prog-fill" id="uploadFill" style="width:0%; height:100%; background:var(--coral)"></div>
+            </div>
+          </div>
+
+          <div id="detectBtnWrap" style="display:none;margin-top:24px;display:flex;gap:16px;align-items:center;flex-wrap:wrap">
+            <button class="btn btn-primary" id="detectBtn" onclick="startDetection()">🔍 RUN AI ANALYSIS</button>
+            <span class="badge badge-idle" id="detectBadge" style="border:1px solid var(--border)">READY</span>
+            <span style="font-size:12px;color:var(--dim)" id="detectMsg"></span>
+          </div>
+        </div>
+
+        <div class="prog-wrap card" id="detectProg" style="display:none; margin-bottom:24px">
+          <div class="sec-title">NEURAL NETWORK PROCESSING</div>
+          <div id="detectMsgLong">Analyzing frames...</div>
+          <div class="prog-track" style="height:8px; background:rgba(255,255,255,0.05); border-radius:4px; overflow:hidden; margin:16px 0">
+            <div class="prog-fill" style="width:100%; height:100%; background:var(--coral); animation: causticsMove 2s linear infinite"></div>
+          </div>
+          <span class="badge badge-run">YOLOv8 ACTIVE</span>
+        </div>
+
+        <div class="card" id="resultsBox" style="display:none">
+          <div class="sec-title">✅ Analysis Successful</div>
+          <div class="vid-grid" style="display:grid; grid-template-columns: 1fr 1fr; gap:20px">
+            <div class="vid-wrap" style="border:1px solid var(--border); border-radius:8px; overflow:hidden">
+              <div class="vid-label" style="padding:10px; background:rgba(0,0,0,0.4); font-size:10px">SOURCE STREAM</div>
+              <video id="origVid" controls style="width:100%"></video>
+            </div>
+            <div class="vid-wrap" style="border:1px solid var(--border); border-radius:8px; overflow:hidden">
+              <div class="vid-label" style="padding:10px; background:rgba(0,0,0,0.4); font-size:10px; color:var(--coral)">AI ANNOTATED STREAM</div>
+              <video id="outVid" controls style="width:100%"></video>
+            </div>
+          </div>
+          <div style="margin-top:24px">
+            <div class="stat-lbl" style="margin-bottom:12px">Identified Entities</div>
+            <div class="obj-pills" id="objPills" style="display:flex; gap:10px; flex-wrap:wrap"></div>
+          </div>
+          <div style="margin-top:24px;display:flex;gap:12px">
+            <a class="btn btn-primary" id="downloadBtn" href="#" download>⬇️ EXPORT REPORT</a>
+            <button class="btn btn-ghost" onclick="showPanel('bot',document.getElementById('nav-bot'))">🤖 CONSULT AQUABOT</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══ CHAT ═══ -->
+      <div class="panel" id="panel-bot">
+        <div class="sec-title">🤖 AquaBot — Tactical Assistant</div>
+        <div class="chat-layout">
+          <div class="chat-main card" style="padding:0">
+            <div class="chat-msgs" id="chatMsgs" style="height:500px; overflow-y:auto; padding:24px">
+              <div class="msg bot">
+                <div class="msg-bbl">
+                  Hello explorer! 🌊 I'm <strong>AquaBot</strong>, your maritime intelligence assistant.
+                  <br><br>I can provide insights on species counts, behavioral activities, and environmental predictions.
+                  Try asking: <em>"What was detected in the video?"</em>
+                </div>
+              </div>
+            </div>
+            <div class="chat-input-bar">
+              <input class="chat-inp" id="chatInp" placeholder="Enter tactical query..."
+                onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMsg()}"/>
+              <button class="btn btn-primary" id="chatSendBtn" onclick="sendMsg()" style="padding:10px 24px">SEND</button>
+            </div>
+          </div>
+
+          <div class="chat-side">
+            <div class="stat-lbl" style="padding-bottom:12px">Tactical Presets</div>
+            <div class="prompt-card" onclick="setQ(this.dataset.q)" data-q="What objects were detected in the video?">
+              <strong>Summary</strong>Full object list
+            </div>
+            <div class="prompt-card" onclick="setQ(this.dataset.q)" data-q="How many total detections are there?">
+              <strong>Statistics</strong>Total detection count
+            </div>
+            <div class="prompt-card" onclick="setQ(this.dataset.q)" data-q="What is the predicted environment?">
+              <strong>Environment</strong>Biotope prediction
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <div id="toast"></div>
 
 <script>
-// ══════════════════════════════════════════════════════════
-// AquaVision Frontend — Full API Integration
-// ══════════════════════════════════════════════════════════
-
-const API =
-  location.hostname === 'localhost' || location.hostname === '127.0.0.1'
-    ? 'http://localhost:8000'
-    : location.origin;
+const API = 'http://localhost:8000';
 const SID = 'sess_' + Math.random().toString(36).slice(2);
 
-// ── Bubbles ──────────────────────────────────────────────
+// ── Bubbles Interface ──────────────────────────────────────────
 (()=>{
   const w = document.getElementById('bubbles');
-  for(let i=0;i<16;i++){
+  for(let i=0;i<20;i++){
     const b=document.createElement('div');
     b.className='bbl';
-    const s=Math.random()*14+5;
-    b.style.cssText=`width:${s}px;height:${s}px;left:${Math.random()*100}%;animation-duration:${Math.random()*14+7}s;animation-delay:${Math.random()*8}s;opacity:${Math.random()*.35+.08}`;
+    const s=Math.random()*12+4;
+    b.style.cssText=`width:${s}px;height:${s}px;left:${Math.random()*100}%;animation-duration:${Math.random()*15+8}s;animation-delay:${Math.random()*10}s;opacity:${Math.random()*.2+.05}`;
     w.appendChild(b);
   }
 })();
 
-// ── Panel switching ──────────────────────────────────────
+// ── Panel Logic ──────────────────────────────────────────────
 function showPanel(id,btn){
   document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
-  document.getElementById('panel-'+id).classList.add('active');
+  const target = document.getElementById('panel-'+id);
+  if(target) target.classList.add('active');
   if(btn) btn.classList.add('active');
-  if(id==='dashboard') loadDashboard();
+  if(id==='dash') loadDashboard();
 }
 
-// ── Toast ────────────────────────────────────────────────
-function toast(msg,err=false){
-  const t=document.getElementById('toast');
-  t.textContent=msg; t.className='show'+(err?' err':'');
-  setTimeout(()=>t.className='',3200);
-}
-
-// ══════════════════════════════════════════════════════════
-//  DASHBOARD — fetch /stats
-// ══════════════════════════════════════════════════════════
+// ── Dashboard Core ─────────────────────────────────────────────
 async function loadDashboard(){
   try{
     const r = await fetch(`${API}/stats`);
-    if(!r.ok) throw new Error(`HTTP ${r.status}`);
     const d = await r.json();
     if(d.error) return;
 
-    // Update stat cards with real API data
-    document.getElementById('s-total').textContent = d.total_detections.toLocaleString();
-    document.getElementById('s-unique').textContent = d.unique_objects?.length || 0;
-    document.getElementById('s-env').textContent = d.environment || '—';
+    document.getElementById('count-total').textContent = (d.total_detections || 0).toLocaleString();
+    document.getElementById('count-videos').textContent = (d.unique_videos || 0);
+    document.getElementById('env-text').textContent = d.environment || 'Scanning...';
+    document.getElementById('top-obj-name').textContent = d.top_objects?.[0]?.label || 'None';
 
-    // System status
-    const statusEl = document.getElementById('s-status');
-    statusEl.textContent = 'LIVE';
-    statusEl.style.color = 'var(--green)';
-
-    // Top objects bar chart
     const chart = document.getElementById('top-chart');
     if(d.top_objects?.length){
       const max = d.top_objects[0].count;
@@ -637,396 +458,119 @@ async function loadDashboard(){
           <div class="bar-meta"><span>${o.label}</span><span>${o.count.toLocaleString()}</span></div>
           <div class="bar-track"><div class="bar-fill" style="width:${(o.count/max*100).toFixed(1)}%"></div></div>
         </div>`).join('');
-    } else {
-      chart.innerHTML='<div class="empty"><span>📊</span>Run detection to see data</div>';
     }
 
-    // Activities breakdown
     const ap = document.getElementById('activity-pills');
     if(d.activities?.length){
-      ap.innerHTML='<div class="pill-row">'+d.activities.map(a=>{
-        const cls = a.label?.includes('fast')?'pill-fast':a.label?.includes('normal')?'pill-normal':a.label?.includes('stat')?'pill-stat':'pill-unk';
-        return `<span class="pill ${cls}">${a.label} <strong style="font-family:var(--mono)">${a.count}</strong></span>`;
-      }).join('')+'</div>';
-    } else {
-      ap.innerHTML='<div class="empty"><span>🏃</span>No activity data yet</div>';
+      ap.innerHTML='<div style="display:flex;flex-wrap:wrap;gap:8px">'+d.activities.map(a=>
+        `<span class="badge badge-run" style="font-size:10px;background:rgba(255,107,61,0.1)">${a.label} (${a.count})</span>`
+      ).join('')+'</div>';
     }
-  }catch(e){
-    console.error('Dashboard load error:', e);
-    const statusEl = document.getElementById('s-status');
-    statusEl.textContent = 'OFFLINE';
-    statusEl.style.color = 'var(--red)';
-  }
+  }catch(e){ console.error('Dashboard Error:', e); }
 }
 
-// ══════════════════════════════════════════════════════════
-//  PREDICT ENVIRONMENT — fetch /predict-environment
-// ══════════════════════════════════════════════════════════
 async function predictEnvironment(){
-  const btn = document.getElementById('predictEnvBtn');
-  const result = document.getElementById('predictResult');
-  btn.disabled = true;
-  result.textContent = 'Predicting...';
-
+  const res = document.getElementById('env-text');
+  res.textContent = 'Analyzing...';
   try{
-    const r = await fetch(`${API}/predict-environment`, {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({})
-    });
-    if(!r.ok) throw new Error((await r.json()).detail || `HTTP ${r.status}`);
+    const r = await fetch(`${API}/predict-environment`, {method:'POST'});
     const d = await r.json();
-    result.textContent = `🌍 ${d.predicted_environment}`;
-    document.getElementById('s-env').textContent = d.predicted_environment;
-    toast('Environment predicted: ' + d.predicted_environment);
-  }catch(e){
-    result.textContent = '❌ ' + e.message;
-    toast(e.message, true);
-  }finally{
-    btn.disabled = false;
-  }
+    res.textContent = d.predicted_environment;
+    toast('Deep scan completed!');
+    loadDashboard();
+  }catch(e){ toast('Scan failed', true); }
 }
 
-// ══════════════════════════════════════════════════════════
-//  UPLOAD MEDIA — supports both images and videos
-// ══════════════════════════════════════════════════════════
+// ── Upload & Detect ───────────────────────────────────────────
 const zone = document.getElementById('uploadZone');
 const finput = document.getElementById('fileInput');
-let uploadedFile = null;
-let uploadedFileURL = null;
-let uploadedFileType = null; // 'image' or 'video'
 
-const IMAGE_EXTS = ['.jpg', '.jpeg', '.png', '.bmp', '.webp'];
-const VIDEO_EXTS = ['.mp4', '.avi', '.mov', '.mkv', '.webm'];
-
-function getFileType(filename) {
-  const ext = '.' + filename.split('.').pop().toLowerCase();
-  if (IMAGE_EXTS.includes(ext)) return 'image';
-  if (VIDEO_EXTS.includes(ext)) return 'video';
-  return null;
-}
-
-zone.addEventListener('dragover', e=>{e.preventDefault();zone.classList.add('over')});
-zone.addEventListener('dragleave', ()=>zone.classList.remove('over'));
-zone.addEventListener('drop', e=>{
-  e.preventDefault();zone.classList.remove('over');
-  if(e.dataTransfer.files[0]) doUpload(e.dataTransfer.files[0]);
-});
-finput.addEventListener('change', ()=>{if(finput.files[0]) doUpload(finput.files[0])});
+zone.onclick = () => finput.click();
+finput.onchange = () => { if(finput.files[0]) doUpload(finput.files[0]); };
 
 async function doUpload(file){
-  uploadedFile = file;
-  uploadedFileURL = URL.createObjectURL(file);
-  uploadedFileType = getFileType(file.name);
-
-  if (!uploadedFileType) {
-    toast('Unsupported file type. Use images (JPG/PNG/WEBP) or videos (MP4/AVI/MOV).', true);
-    return;
-  }
-
-  const prog = document.getElementById('uploadProg');
-  prog.classList.add('show');
-  document.getElementById('uploadText').textContent = `Uploading ${file.name}...`;
-  document.getElementById('uploadFill').style.width = '30%';
-  document.getElementById('uploadPct').textContent = '...';
-
-  // Hide previous results
-  document.getElementById('resultsBox').style.display = 'none';
-  document.getElementById('imageResultsBox').style.display = 'none';
-
-  const fd = new FormData();
-  fd.append('file', file);
-
-  // Route to the correct upload endpoint
-  const uploadUrl = uploadedFileType === 'image' ? `${API}/upload-image` : `${API}/upload`;
-
-  try{
-    const r = await fetch(uploadUrl, {method:'POST', body:fd});
-    if(!r.ok){
-      const err = await r.json();
-      throw new Error(err.detail || 'Upload failed');
-    }
+  document.getElementById('uploadProg').style.display = 'block';
+  const fd = new FormData(); fd.append('file', file);
+  try {
+    const r = await fetch(`${API}/upload`, {method:'POST', body:fd});
     const d = await r.json();
     if(d.status === 'uploaded'){
       document.getElementById('uploadFill').style.width = '100%';
-      document.getElementById('uploadPct').textContent = '✅';
-      document.getElementById('uploadText').textContent = `${file.name} uploaded (${d.size_mb} MB)`;
+      document.getElementById('uploadPct').textContent = '100%';
       document.getElementById('detectBtnWrap').style.display = 'flex';
-
-      // Show file type badge
-      const badge = document.getElementById('fileTypeBadge');
-      if (uploadedFileType === 'image') {
-        badge.innerHTML = '<span class="file-type-badge img">🖼️ IMAGE</span>';
-      } else {
-        badge.innerHTML = '<span class="file-type-badge vid">🎬 VIDEO</span>';
-      }
-
-      // For video: set up original video preview
-      if (uploadedFileType === 'video') {
-        const v = document.getElementById('origVid');
-        const ve = document.getElementById('origVidErr');
-        ve.style.display = 'none';
-        v.src = uploadedFileURL;
-        v.onerror = () => { ve.style.display = 'flex'; };
-      }
-      // For image: set up original image preview
-      if (uploadedFileType === 'image') {
-        document.getElementById('origImg').src = uploadedFileURL;
-      }
-
-      toast(`${uploadedFileType === 'image' ? '🖼️ Image' : '🎬 Video'} uploaded! Click Start Detection 🐠`);
-    } else {
-      throw new Error(d.detail || 'Upload failed');
+      document.getElementById('origVid').src = URL.createObjectURL(file);
+      toast('Payload ready for analysis!');
     }
-  }catch(e){
-    document.getElementById('uploadFill').style.width = '0%';
-    document.getElementById('uploadText').textContent = 'Upload failed: ' + e.message;
-    document.getElementById('uploadPct').textContent = '❌';
-    toast(e.message, true);
-  }
+  } catch(e){ toast('Upload failed', true); }
 }
-
-// ══════════════════════════════════════════════════════════
-//  DETECTION — routes to image or video detection
-// ══════════════════════════════════════════════════════════
-let pollTimer = null;
 
 async function startDetection(){
-  if (!uploadedFileType) {
-    toast('Upload a file first!', true);
-    return;
-  }
-
   document.getElementById('detectBtn').disabled = true;
-  document.getElementById('detectBadge').className = 'badge badge-run';
   document.getElementById('detectBadge').textContent = 'RUNNING';
-  document.getElementById('detectMsg').textContent = 'Processing...';
   document.getElementById('detectProg').style.display = 'block';
-  document.getElementById('resultsBox').style.display = 'none';
-  document.getElementById('imageResultsBox').style.display = 'none';
-
-  if (uploadedFileType === 'image') {
-    await startImageDetection();
-  } else {
-    await startVideoDetection();
-  }
-}
-
-// ── Image Detection (instant — no polling) ───────────────
-async function startImageDetection() {
   try {
-    const r = await fetch(`${API}/detect-image`, { method: 'POST' });
-    if (!r.ok) {
-      const err = await r.json();
-      throw new Error(err.detail || 'Image detection failed');
-    }
-    const d = await r.json();
-    if (d.status === 'done') {
-      onImageDetectDone(d);
-    } else {
-      throw new Error(d.message || 'Detection failed');
-    }
-  } catch (e) {
-    showDetectError(e.message);
-  }
-}
-
-function onImageDetectDone(data) {
-  document.getElementById('detectBadge').className = 'badge badge-done';
-  document.getElementById('detectBadge').textContent = 'COMPLETE';
-  document.getElementById('detectProg').style.display = 'none';
-  document.getElementById('detectBtn').disabled = false;
-
-  // Show detected image
-  const outImg = document.getElementById('outImg');
-  outImg.src = `${API}${data.output_image}?t=${Date.now()}`;
-
-  // Show download link
-  document.getElementById('imgDownloadBtn').href = `${API}${data.output_image}`;
-
-  // Show object pills
-  const pills = document.getElementById('imgObjPills');
-  if (data.objects?.length) {
-    pills.innerHTML = data.objects.map(o =>
-      `<div class="obj-pill">${o.name}<span class="obj-pill-cnt">${(o.confidence * 100).toFixed(0)}%</span></div>`
-    ).join('');
-  } else {
-    pills.innerHTML = '<span style="color:var(--dim);font-size:12px">No objects detected</span>';
-  }
-
-  document.getElementById('imageResultsBox').style.display = 'block';
-  document.getElementById('detectMsg').textContent = data.message || '';
-  loadDashboard();
-  toast(`🖼️ Image detection complete — ${data.total_objects || 0} objects found!`);
-}
-
-// ── Video Detection (background + polling) ───────────────
-async function startVideoDetection(){
-  try{
     const r = await fetch(`${API}/detect`, {method:'POST'});
-    if(!r.ok){
-      const err = await r.json();
-      throw new Error(err.detail || 'Failed to start detection');
-    }
-    const d = await r.json();
-    if(d.status === 'started' || d.status === 'already_running'){
-      pollDetection();
-    } else {
-      throw new Error(d.detail || 'Failed to start');
-    }
-  }catch(e){
-    showDetectError(e.message);
-  }
+    pollDetection();
+  } catch(e){ toast('Detection error', true); }
 }
 
 function pollDetection(){
-  if(pollTimer) clearInterval(pollTimer);
-  pollTimer = setInterval(async()=>{
-    try{
+  const t = setInterval(async()=>{
+    try {
       const r = await fetch(`${API}/detect/status`);
       const d = await r.json();
-      document.getElementById('detectMsg').textContent = d.message || '';
-
-      if(d.status === 'done'){
-        clearInterval(pollTimer);
-        pollTimer = null;
-        onDetectDone(d);
-      } else if(d.status === 'error'){
-        clearInterval(pollTimer);
-        pollTimer = null;
-        showDetectError(d.message);
-      }
-    }catch(e){console.error('Poll error:', e)}
+      const msg = document.getElementById('detectMsgLong');
+      if(msg) msg.textContent = d.message;
+      if(d.status === 'done'){ clearInterval(t); onDetectDone(d); }
+      if(d.status === 'error'){ clearInterval(t); toast('Analysis failed', true); }
+    } catch(e) {}
   }, 1500);
 }
 
-async function onDetectDone(data){
-  document.getElementById('detectBadge').className = 'badge badge-done';
+function onDetectDone(data){
   document.getElementById('detectBadge').textContent = 'COMPLETE';
   document.getElementById('detectProg').style.display = 'none';
-  document.getElementById('detectBtn').disabled = false;
-
-  // Show output video from API
-  const outputUrl = `${API}/output-video?t=${Date.now()}`;
-  const outVid = document.getElementById('outVid');
-  const outErr = document.getElementById('outVidErr');
-  
-  outErr.style.display = 'none';
-  outVid.src = outputUrl;
-  outVid.load();
-  
-  outVid.onerror = () => {
-    outErr.style.display = 'flex';
-    console.error('Detection video playback error');
-  };
-
-  document.getElementById('downloadBtn').href = outputUrl;
   document.getElementById('resultsBox').style.display = 'block';
-
-  // Load real object data from /stats
-  try{
-    const r = await fetch(`${API}/stats`);
-    const d = await r.json();
-    const pills = document.getElementById('objPills');
-    if(d.top_objects?.length){
-      pills.innerHTML = d.top_objects.map(o=>
-        `<div class="obj-pill">${o.label}<span class="obj-pill-cnt">${o.count}</span></div>`
-      ).join('');
-    }
-    // Refresh dashboard data
-    loadDashboard();
-  }catch(e){console.error(e)}
-
-  toast('🐠 Detection complete!');
+  document.getElementById('outVid').src = `${API}/output-video?t=${Date.now()}`;
+  loadDashboard();
 }
 
-function showDetectError(msg){
-  document.getElementById('detectBadge').className = 'badge badge-err';
-  document.getElementById('detectBadge').textContent = 'ERROR';
-  document.getElementById('detectMsg').textContent = msg;
-  document.getElementById('detectBtn').disabled = false;
-  document.getElementById('detectProg').style.display = 'none';
-  toast(msg, true);
-}
-
-// ══════════════════════════════════════════════════════════
-//  CHATBOT — fetch /chat
-// ══════════════════════════════════════════════════════════
 async function sendMsg(){
   const inp = document.getElementById('chatInp');
   const msg = inp.value.trim();
   if(!msg) return;
   inp.value = '';
-
   appendMsg('user', msg);
-  const typing = appendTyping();
-
-  try{
+  try {
     const r = await fetch(`${API}/chat`, {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({message: msg, session_id: SID})
+      method:'POST', 
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({message:msg, session_id:SID})
     });
-    if(!r.ok){
-      const err = await r.json();
-      throw new Error(err.detail || `HTTP ${r.status}`);
-    }
     const d = await r.json();
-    typing.remove();
-    appendMsg('bot', d.response || 'Sorry, I could not process that.');
-  }catch(e){
-    typing.remove();
-    appendMsg('bot', '⚠️ ' + (e.message || 'Connection error. Is the server running?'));
-  }
+    appendMsg('bot', d.response);
+  } catch(e){ appendMsg('bot', 'Tactical link severed.'); }
 }
 
 function appendMsg(role, text){
   const w = document.getElementById('chatMsgs');
   const d = document.createElement('div');
   d.className = 'msg ' + role;
-  d.innerHTML = `<div class="msg-av">${role==='bot'?'🐠':'👤'}</div><div class="msg-bbl">${escH(text)}</div>`;
-  w.appendChild(d);
-  w.scrollTop = w.scrollHeight;
-  return d;
-}
-
-function appendTyping(){
-  const w = document.getElementById('chatMsgs');
-  const d = document.createElement('div');
-  d.className = 'msg bot';
-  d.innerHTML = `<div class="msg-av">🐠</div><div class="msg-bbl"><div class="typing"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div></div>`;
+  d.style.marginBottom = '16px';
+  d.style.display = 'flex';
+  d.style.justifyContent = role === 'user' ? 'flex-end' : 'flex-start';
+  d.innerHTML = `<div class="msg-bbl" style="max-width:80%; ${role==='user'?'background:rgba(255,107,61,0.1); border-color:var(--coral)':''}">${text.replace(/\n/g,'<br>')}</div>`;
   w.appendChild(d); w.scrollTop = w.scrollHeight;
-  return d;
 }
 
-function escH(s){
-  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
+function setQ(q){ document.getElementById('chatInp').value = q; }
+function toast(msg, err){
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.className = 'show' + (err?' err':'');
+  setTimeout(()=>t.className='', 3000);
 }
 
-function setQ(q){
-  document.getElementById('chatInp').value = q;
-  document.getElementById('chatInp').focus();
-}
-
-// ══════════════════════════════════════════════════════════
-//  INIT — Load dashboard & check detection status on boot
-// ══════════════════════════════════════════════════════════
 loadDashboard();
-
-// Auto-check if a detection is already running
-fetch(`${API}/detect/status`).then(r=>r.json()).then(d=>{
-  if(d.status === 'running'){
-    document.getElementById('detectBtnWrap').style.display = 'flex';
-    document.getElementById('detectBadge').className = 'badge badge-run';
-    document.getElementById('detectBadge').textContent = 'RUNNING';
-    document.getElementById('detectProg').style.display = 'block';
-    pollDetection();
-  } else if(d.status === 'done'){
-    document.getElementById('detectBtnWrap').style.display = 'flex';
-    document.getElementById('detectBadge').className = 'badge badge-done';
-    document.getElementById('detectBadge').textContent = 'COMPLETE';
-  }
-}).catch(()=>{});
 </script>
 </body>
 </html>
