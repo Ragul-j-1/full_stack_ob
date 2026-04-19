@@ -3,16 +3,19 @@ import sqlite3
 import math
 import os
 import sys
+from typing import Any, Optional, TypeAlias
 from ultralytics import YOLO
 from collections import Counter
 import imageio
 
-def log(msg):
+JSONDict: TypeAlias = dict[str, Any]
+
+def log(msg: str) -> None:
     """Log to stderr so it doesn't interfere with MCP stdout."""
     sys.stderr.write(f"{msg}\n")
     sys.stderr.flush()
 
-def run_detection(video_name: str = "video.mp4", db_directory: str = None) -> str:
+def run_detection(video_name: str = "video.mp4", db_directory: Optional[str] = None) -> str:
     # -----------------------------
     # Configuration & Paths
     # -----------------------------
@@ -243,6 +246,180 @@ def run_detection(video_name: str = "video.mp4", db_directory: str = None) -> st
     result_msg = f"Detection completed for {video_name}. Metadata & Events recorded at {DB_PATH}. Output: {OUTPUT_VIDEO_PATH}."
     log(result_msg)
     return result_msg
+
+def run_image_detection(image_name: str = "image.jpg", db_directory: Optional[str] = None) -> JSONDict:
+    """Run YOLO object detection on a single image.
+    
+    Returns a dict with detection results (objects found, output image path, etc.).
+    Stores detections in the same SQLite DB as video detections for RAG access.
+    """
+    # -----------------------------
+    # Configuration & Paths
+    # -----------------------------
+    ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+    MODEL_PATH = os.path.join(ROOT_DIR, "models", "yolov8n.pt")
+    IMAGE_PATH = os.path.join(ROOT_DIR, "input_video", image_name)
+
+    if db_directory is None:
+        db_directory = os.path.join(ROOT_DIR, "database")
+
+    DB_PATH = os.path.join(db_directory, "detections.db")
+    output_dir = os.path.join(ROOT_DIR, "output_video")
+
+    os.makedirs(db_directory, exist_ok=True)
+    os.makedirs(output_dir, exist_ok=True)
+
+    # Output image name
+    base, ext = os.path.splitext(image_name)
+    OUTPUT_IMAGE_PATH = os.path.join(output_dir, f"detected_{image_name}")
+
+    # -----------------------------
+    # Validate
+    # -----------------------------
+    if not os.path.exists(IMAGE_PATH):
+        return {"status": "error", "message": f"Image not found at {IMAGE_PATH}"}
+
+    # -----------------------------
+    # Load YOLO model
+    # -----------------------------
+    if not os.path.exists(MODEL_PATH):
+        fallback_model = "yolov8n.pt"
+        log(f"Warning: Model not found at {MODEL_PATH}. Trying {fallback_model}...")
+        model = YOLO(fallback_model)
+    else:
+        model = YOLO(MODEL_PATH)
+
+    # -----------------------------
+    # Database Setup
+    # -----------------------------
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS detections (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        video_name TEXT,
+        object_name TEXT,
+        object_label TEXT,
+        activity TEXT,
+        speed REAL,
+        frame_number INTEGER
+    )
+    """)
+
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS video_metadata (
+        video_name TEXT PRIMARY KEY,
+        fps REAL,
+        total_frames INTEGER,
+        duration_seconds REAL,
+        width INTEGER,
+        height INTEGER,
+        processed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    """)
+
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS video_events (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        video_name TEXT,
+        object_label TEXT,
+        object_name TEXT,
+        start_frame INTEGER,
+        end_frame INTEGER,
+        dominant_activity TEXT,
+        avg_speed REAL
+    )
+    """)
+    conn.commit()
+
+    # -----------------------------
+    # Read Image & Run Detection
+    # -----------------------------
+    frame = cv2.imread(IMAGE_PATH)
+    if frame is None:
+        conn.close()
+        return {"status": "error", "message": f"Could not read image: {IMAGE_PATH}"}
+
+    height, width = frame.shape[:2]
+
+    # Save image metadata (fps=0, frames=1 for images)
+    cursor.execute("""
+    INSERT OR REPLACE INTO video_metadata (video_name, fps, total_frames, duration_seconds, width, height)
+    VALUES (?, ?, ?, ?, ?, ?)
+    """, (image_name, 0, 1, 0, width, height))
+    conn.commit()
+
+    # Run YOLO
+    results = model(frame, verbose=False, conf=0.25)
+
+    detected_objects: list[JSONDict] = []
+    object_counter: dict[str, int] = {}
+
+    for r in results:
+        if r.boxes is None:
+            continue
+
+        boxes = r.boxes
+        cls_list = boxes.cls.tolist()
+        xyxy_list = boxes.xyxy.tolist()
+        conf_list = boxes.conf.tolist()
+
+        for i, class_id in enumerate(cls_list):
+            object_name = model.names[int(class_id)]
+            x1, y1, x2, y2 = map(int, xyxy_list[i])
+            confidence = conf_list[i]
+
+            # Assign unique label
+            if object_name not in object_counter:
+                object_counter[object_name] = 0
+            object_counter[object_name] += 1
+            label_id = f"{object_name}_{object_counter[object_name]}"
+
+            # Draw bounding box on frame
+            cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
+            label_text = f"{label_id} ({confidence:.2f})"
+            cv2.putText(frame, label_text, (x1, y1 - 10),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+
+            # Save to DB
+            cursor.execute("""
+            INSERT INTO detections (video_name, object_name, object_label, activity, speed, frame_number)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """, (image_name, object_name, label_id, "stationary", 0, 0))
+
+            # Save event
+            cursor.execute("""
+            INSERT INTO video_events (video_name, object_label, object_name, start_frame, end_frame, dominant_activity, avg_speed)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """, (image_name, label_id, object_name, 0, 0, "stationary", 0))
+
+            detected_objects.append({
+                "name": object_name,
+                "label": label_id,
+                "confidence": round(confidence, 3),
+                "bbox": [x1, y1, x2, y2],
+            })
+
+    conn.commit()
+    conn.close()
+
+    # Save annotated image
+    cv2.imwrite(OUTPUT_IMAGE_PATH, frame)
+
+    log(f"Image detection completed for {image_name}: {len(detected_objects)} objects found.")
+
+    return {
+        "status": "done",
+        "message": f"Detected {len(detected_objects)} objects in {image_name}",
+        "image_name": image_name,
+        "output_image": f"/output_video/detected_{image_name}",
+        "objects": detected_objects,
+        "object_summary": {name: count for name, count in object_counter.items()},
+        "total_objects": len(detected_objects),
+    }
+
 
 if __name__ == "__main__":
     run_detection()

@@ -324,6 +324,22 @@ main{flex:1;padding:28px 32px;max-width:1400px;margin:0 auto;width:100%}
 
 /* ── Predict button ── */
 .predict-btn-wrap{margin-top:14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+
+/* ── Image results ── */
+.img-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:16px}
+@media(max-width:680px){.img-grid{grid-template-columns:1fr}}
+.img-wrap{border-radius:12px;overflow:hidden;border:1px solid var(--border);background:#000}
+.img-wrap img{width:100%;display:block;max-height:400px;object-fit:contain}
+.img-label{padding:9px 14px;font-size:10px;letter-spacing:2px;color:var(--dim);text-transform:uppercase;background:rgba(0,0,0,.5);font-family:var(--mono)}
+
+/* ── File type badge ── */
+.file-type-badge{
+  display:inline-flex;align-items:center;gap:6px;
+  padding:4px 12px;border-radius:10px;font-size:10px;font-weight:700;
+  letter-spacing:1px;margin-left:8px;
+}
+.file-type-badge.img{background:rgba(155,109,255,.12);color:var(--purple);border:1px solid rgba(155,109,255,.25)}
+.file-type-badge.vid{background:rgba(0,200,255,.08);color:var(--cyan);border:1px solid rgba(0,200,255,.2)}
 </style>
 </head>
 <body>
@@ -407,10 +423,11 @@ main{flex:1;padding:28px 32px;max-width:1400px;margin:0 auto;width:100%}
 
       <div class="card" style="margin-bottom:14px">
         <div class="upload-zone" id="uploadZone">
-          <input type="file" id="fileInput" accept="video/*"/>
-          <span class="upload-icon">🎬</span>
-          <h3>Drop your underwater video here</h3>
-          <p style="margin-bottom:18px">MP4 · AVI · MOV · MKV · WEBM</p>
+          <input type="file" id="fileInput" accept="image/*,video/*"/>
+          <span class="upload-icon">📁</span>
+          <h3>Drop your image or video here</h3>
+          <p style="margin-bottom:6px">Images: JPG · PNG · WEBP &nbsp;|&nbsp; Videos: MP4 · AVI · MOV · MKV</p>
+          <p style="margin-bottom:18px;font-size:11px;color:var(--dim)">YOLO detects objects → stored in DB → accessible via AquaBot (RAG)</p>
           <button class="btn btn-primary" id="browse-btn" onclick="document.getElementById('fileInput').click()">📂 Browse Files</button>
         </div>
 
@@ -427,6 +444,7 @@ main{flex:1;padding:28px 32px;max-width:1400px;margin:0 auto;width:100%}
         <div id="detectBtnWrap" style="display:none;margin-top:16px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
           <button class="btn btn-primary" id="detectBtn" onclick="startDetection()">🔍 Start Detection</button>
           <span class="badge badge-idle" id="detectBadge">IDLE</span>
+          <span id="fileTypeBadge"></span>
           <span style="font-size:12px;color:var(--dim)" id="detectMsg"></span>
         </div>
       </div>
@@ -442,7 +460,7 @@ main{flex:1;padding:28px 32px;max-width:1400px;margin:0 auto;width:100%}
         <span class="badge badge-run">PROCESSING</span>
       </div>
 
-      <!-- Results -->
+      <!-- Video Results -->
       <div class="card" id="resultsBox" style="display:none">
         <div class="sec-title">✅ Detection Complete</div>
         <div class="vid-grid">
@@ -470,6 +488,29 @@ main{flex:1;padding:28px 32px;max-width:1400px;margin:0 auto;width:100%}
         <div style="margin-top:16px;display:flex;gap:10px;flex-wrap:wrap">
           <a class="btn btn-primary" id="downloadBtn" href="#" download>⬇️ Download</a>
           <button class="btn btn-ghost" id="ask-aquabot-btn" onclick="showPanel('chat',document.getElementById('nav-chat'))">🤖 Ask AquaBot</button>
+        </div>
+      </div>
+
+      <!-- Image Results -->
+      <div class="card" id="imageResultsBox" style="display:none">
+        <div class="sec-title">✅ Image Detection Complete</div>
+        <div class="img-grid">
+          <div class="img-wrap">
+            <div class="img-label">Original</div>
+            <img id="origImg" src="" alt="Original image"/>
+          </div>
+          <div class="img-wrap">
+            <div class="img-label">🐠 Detected Objects</div>
+            <img id="outImg" src="" alt="Detected objects"/>
+          </div>
+        </div>
+        <div style="margin-top:16px">
+          <div style="font-size:10px;color:var(--dim);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:10px">Objects Found</div>
+          <div class="obj-pills" id="imgObjPills"></div>
+        </div>
+        <div style="margin-top:16px;display:flex;gap:10px;flex-wrap:wrap">
+          <a class="btn btn-primary" id="imgDownloadBtn" href="#" download>⬇️ Download</a>
+          <button class="btn btn-ghost" onclick="showPanel('chat',document.getElementById('nav-chat'))">🤖 Ask AquaBot about this</button>
         </div>
       </div>
     </div>
@@ -647,12 +688,23 @@ async function predictEnvironment(){
 }
 
 // ══════════════════════════════════════════════════════════
-//  UPLOAD VIDEO — fetch /upload
+//  UPLOAD MEDIA — supports both images and videos
 // ══════════════════════════════════════════════════════════
 const zone = document.getElementById('uploadZone');
 const finput = document.getElementById('fileInput');
 let uploadedFile = null;
-let uploadedVideoURL = null;
+let uploadedFileURL = null;
+let uploadedFileType = null; // 'image' or 'video'
+
+const IMAGE_EXTS = ['.jpg', '.jpeg', '.png', '.bmp', '.webp'];
+const VIDEO_EXTS = ['.mp4', '.avi', '.mov', '.mkv', '.webm'];
+
+function getFileType(filename) {
+  const ext = '.' + filename.split('.').pop().toLowerCase();
+  if (IMAGE_EXTS.includes(ext)) return 'image';
+  if (VIDEO_EXTS.includes(ext)) return 'video';
+  return null;
+}
 
 zone.addEventListener('dragover', e=>{e.preventDefault();zone.classList.add('over')});
 zone.addEventListener('dragleave', ()=>zone.classList.remove('over'));
@@ -664,18 +716,32 @@ finput.addEventListener('change', ()=>{if(finput.files[0]) doUpload(finput.files
 
 async function doUpload(file){
   uploadedFile = file;
-  uploadedVideoURL = URL.createObjectURL(file);
+  uploadedFileURL = URL.createObjectURL(file);
+  uploadedFileType = getFileType(file.name);
+
+  if (!uploadedFileType) {
+    toast('Unsupported file type. Use images (JPG/PNG/WEBP) or videos (MP4/AVI/MOV).', true);
+    return;
+  }
+
   const prog = document.getElementById('uploadProg');
   prog.classList.add('show');
   document.getElementById('uploadText').textContent = `Uploading ${file.name}...`;
   document.getElementById('uploadFill').style.width = '30%';
   document.getElementById('uploadPct').textContent = '...';
 
+  // Hide previous results
+  document.getElementById('resultsBox').style.display = 'none';
+  document.getElementById('imageResultsBox').style.display = 'none';
+
   const fd = new FormData();
   fd.append('file', file);
 
+  // Route to the correct upload endpoint
+  const uploadUrl = uploadedFileType === 'image' ? `${API}/upload-image` : `${API}/upload`;
+
   try{
-    const r = await fetch(`${API}/upload`, {method:'POST', body:fd});
+    const r = await fetch(uploadUrl, {method:'POST', body:fd});
     if(!r.ok){
       const err = await r.json();
       throw new Error(err.detail || 'Upload failed');
@@ -686,14 +752,29 @@ async function doUpload(file){
       document.getElementById('uploadPct').textContent = '✅';
       document.getElementById('uploadText').textContent = `${file.name} uploaded (${d.size_mb} MB)`;
       document.getElementById('detectBtnWrap').style.display = 'flex';
-      
-      const v = document.getElementById('origVid');
-      const ve = document.getElementById('origVidErr');
-      ve.style.display = 'none';
-      v.src = uploadedVideoURL;
-      v.onerror = () => { ve.style.display = 'flex'; };
-      
-      toast('Video uploaded! Click Start Detection 🐠');
+
+      // Show file type badge
+      const badge = document.getElementById('fileTypeBadge');
+      if (uploadedFileType === 'image') {
+        badge.innerHTML = '<span class="file-type-badge img">🖼️ IMAGE</span>';
+      } else {
+        badge.innerHTML = '<span class="file-type-badge vid">🎬 VIDEO</span>';
+      }
+
+      // For video: set up original video preview
+      if (uploadedFileType === 'video') {
+        const v = document.getElementById('origVid');
+        const ve = document.getElementById('origVidErr');
+        ve.style.display = 'none';
+        v.src = uploadedFileURL;
+        v.onerror = () => { ve.style.display = 'flex'; };
+      }
+      // For image: set up original image preview
+      if (uploadedFileType === 'image') {
+        document.getElementById('origImg').src = uploadedFileURL;
+      }
+
+      toast(`${uploadedFileType === 'image' ? '🖼️ Image' : '🎬 Video'} uploaded! Click Start Detection 🐠`);
     } else {
       throw new Error(d.detail || 'Upload failed');
     }
@@ -706,18 +787,81 @@ async function doUpload(file){
 }
 
 // ══════════════════════════════════════════════════════════
-//  DETECTION — fetch /detect + poll /detect/status
+//  DETECTION — routes to image or video detection
 // ══════════════════════════════════════════════════════════
 let pollTimer = null;
 
 async function startDetection(){
+  if (!uploadedFileType) {
+    toast('Upload a file first!', true);
+    return;
+  }
+
   document.getElementById('detectBtn').disabled = true;
   document.getElementById('detectBadge').className = 'badge badge-run';
   document.getElementById('detectBadge').textContent = 'RUNNING';
   document.getElementById('detectMsg').textContent = 'Processing...';
   document.getElementById('detectProg').style.display = 'block';
   document.getElementById('resultsBox').style.display = 'none';
+  document.getElementById('imageResultsBox').style.display = 'none';
 
+  if (uploadedFileType === 'image') {
+    await startImageDetection();
+  } else {
+    await startVideoDetection();
+  }
+}
+
+// ── Image Detection (instant — no polling) ───────────────
+async function startImageDetection() {
+  try {
+    const r = await fetch(`${API}/detect-image`, { method: 'POST' });
+    if (!r.ok) {
+      const err = await r.json();
+      throw new Error(err.detail || 'Image detection failed');
+    }
+    const d = await r.json();
+    if (d.status === 'done') {
+      onImageDetectDone(d);
+    } else {
+      throw new Error(d.message || 'Detection failed');
+    }
+  } catch (e) {
+    showDetectError(e.message);
+  }
+}
+
+function onImageDetectDone(data) {
+  document.getElementById('detectBadge').className = 'badge badge-done';
+  document.getElementById('detectBadge').textContent = 'COMPLETE';
+  document.getElementById('detectProg').style.display = 'none';
+  document.getElementById('detectBtn').disabled = false;
+
+  // Show detected image
+  const outImg = document.getElementById('outImg');
+  outImg.src = `${API}${data.output_image}?t=${Date.now()}`;
+
+  // Show download link
+  document.getElementById('imgDownloadBtn').href = `${API}${data.output_image}`;
+
+  // Show object pills
+  const pills = document.getElementById('imgObjPills');
+  if (data.objects?.length) {
+    pills.innerHTML = data.objects.map(o =>
+      `<div class="obj-pill">${o.name}<span class="obj-pill-cnt">${(o.confidence * 100).toFixed(0)}%</span></div>`
+    ).join('');
+  } else {
+    pills.innerHTML = '<span style="color:var(--dim);font-size:12px">No objects detected</span>';
+  }
+
+  document.getElementById('imageResultsBox').style.display = 'block';
+  document.getElementById('detectMsg').textContent = data.message || '';
+  loadDashboard();
+  toast(`🖼️ Image detection complete — ${data.total_objects || 0} objects found!`);
+}
+
+// ── Video Detection (background + polling) ───────────────
+async function startVideoDetection(){
   try{
     const r = await fetch(`${API}/detect`, {method:'POST'});
     if(!r.ok){

@@ -1,12 +1,15 @@
+from __future__ import annotations
+
+import glob
 import os
-import sys
 import shutil
 import sqlite3
+import sys
 import threading
-import glob
+from typing import Any, TypeAlias, Union
 
 from fastapi import FastAPI, HTTPException, UploadFile, File
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -81,11 +84,19 @@ if os.path.exists(FRONTEND_DIR):
         return FileResponse(os.path.join(FRONTEND_DIR, "index.html"))
 
 # ── Detection job state ───────────────────────────────────
-detection_status = {"status": "idle", "message": "No detection running"}
-current_video_name = None  # tracks the uploaded video filename
+JSONDict: TypeAlias = dict[str, Any]
+ObjectList: TypeAlias = list[str]
+
+ALLOWED_VIDEO_EXTENSIONS = {".mp4", ".avi", ".mov", ".mkv", ".webm"}
+ALLOWED_IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
+ALLOWED_EXTENSIONS = ALLOWED_VIDEO_EXTENSIONS | ALLOWED_IMAGE_EXTENSIONS
+
+detection_status: JSONDict = {"status": "idle", "message": "No detection running"}
+current_video_name: str | None = None  # tracks the uploaded video filename
+current_image_name: str | None = None  # tracks the uploaded image filename
 
 # ── Chatbot singleton ────────────────────────────────────
-bot = None
+bot: Any | None = None
 
 # ── Pydantic Models ───────────────────────────────────────
 class ChatRequest(BaseModel):
@@ -93,26 +104,34 @@ class ChatRequest(BaseModel):
     session_id: str = "default"
 
 class PredictRequest(BaseModel):
-    video_name: str = None
-    objects: list = None
+    video_name: str | None = None
+    objects: ObjectList | None = None
+
+
+def get_upload_filename(file: UploadFile) -> str:
+    """Return a validated upload filename."""
+    filename = file.filename
+    if not filename:
+        raise HTTPException(400, "Uploaded file is missing a filename")
+    return filename
 
 
 # ══════════════════════════════════════════════════════════
 #  ROOT — Serve frontend HTML directly
 # ══════════════════════════════════════════════════════════
-@app.get("/")
-def root():
+@app.get("/", response_model=None)
+def root() -> Union[FileResponse, JSONDict]:
     index_path = os.path.join(FRONTEND_DIR, "index.html")
     if os.path.exists(index_path):
         return FileResponse(index_path, media_type="text/html")
     return {"status": "online", "message": "AquaVision API is ready 🌊"}
 
 @app.get("/api")
-def api_status():
+def api_status() -> JSONDict:
     return {"status": "online", "message": "AquaVision API is ready 🌊"}
 
 @app.get("/health")
-def health_check():
+def health_check() -> JSONDict:
     return {"status": "healthy"}
 
 
@@ -120,25 +139,92 @@ def health_check():
 #  1. POST /upload — Upload video to input_video/
 # ══════════════════════════════════════════════════════════
 @app.post("/upload")
-async def upload_video(file: UploadFile = File(...)):
+async def upload_video(file: UploadFile = File(...)) -> JSONDict:
     """Upload a video file to input_video/ directory."""
     global current_video_name
     try:
-        allowed = {".mp4", ".avi", ".mov", ".mkv", ".webm"}
-        ext = os.path.splitext(file.filename)[1].lower()
-        if ext not in allowed:
-            raise HTTPException(400, f"File type '{ext}' not allowed. Use: {', '.join(allowed)}")
+        filename = get_upload_filename(file)
+        ext = os.path.splitext(filename)[1].lower()
+        if ext not in ALLOWED_VIDEO_EXTENSIONS:
+            raise HTTPException(400, f"File type '{ext}' not allowed. Use: {', '.join(ALLOWED_VIDEO_EXTENSIONS)}")
 
         # Save with original filename
-        save_path = os.path.join(INPUT_DIR, file.filename)
+        save_path = os.path.join(INPUT_DIR, filename)
         with open(save_path, "wb") as f:
             shutil.copyfileobj(file.file, f)
 
-        current_video_name = file.filename
+        current_video_name = filename
         size_mb = os.path.getsize(save_path) / 1e6
         return {
             "status": "uploaded",
-            "filename": file.filename,
+            "filename": filename,
+            "size_mb": round(size_mb, 2),
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
+
+# ══════════════════════════════════════════════════════════
+#  1b. POST /upload-image — Upload image to input_video/
+# ══════════════════════════════════════════════════════════
+@app.post("/upload-image")
+async def upload_image(file: UploadFile = File(...)) -> JSONDict:
+    """Upload an image file for object detection."""
+    global current_image_name
+    try:
+        filename = get_upload_filename(file)
+        ext = os.path.splitext(filename)[1].lower()
+        if ext not in ALLOWED_IMAGE_EXTENSIONS:
+            raise HTTPException(400, f"File type '{ext}' not allowed. Use: {', '.join(ALLOWED_IMAGE_EXTENSIONS)}")
+
+        save_path = os.path.join(INPUT_DIR, filename)
+        with open(save_path, "wb") as f:
+            shutil.copyfileobj(file.file, f)
+
+        current_image_name = filename
+        size_mb = os.path.getsize(save_path) / 1e6
+        return {
+            "status": "uploaded",
+            "filename": filename,
+            "file_type": "image",
+            "size_mb": round(size_mb, 2),
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
+
+# ══════════════════════════════════════════════════════════
+#  1c. POST /upload-media — Upload image OR video (auto-detect)
+# ══════════════════════════════════════════════════════════
+@app.post("/upload-media")
+async def upload_media(file: UploadFile = File(...)) -> JSONDict:
+    """Upload an image or video file. Auto-detects the type."""
+    global current_video_name, current_image_name
+    try:
+        filename = get_upload_filename(file)
+        ext = os.path.splitext(filename)[1].lower()
+        if ext not in ALLOWED_EXTENSIONS:
+            raise HTTPException(400, f"File type '{ext}' not allowed. Use: {', '.join(ALLOWED_EXTENSIONS)}")
+
+        save_path = os.path.join(INPUT_DIR, filename)
+        with open(save_path, "wb") as f:
+            shutil.copyfileobj(file.file, f)
+
+        file_type = "image" if ext in ALLOWED_IMAGE_EXTENSIONS else "video"
+        if file_type == "image":
+            current_image_name = filename
+        else:
+            current_video_name = filename
+
+        size_mb = os.path.getsize(save_path) / 1e6
+        return {
+            "status": "uploaded",
+            "filename": filename,
+            "file_type": file_type,
             "size_mb": round(size_mb, 2),
         }
     except HTTPException:
@@ -151,7 +237,7 @@ async def upload_video(file: UploadFile = File(...)):
 #  2. POST /detect — Start background detection
 # ══════════════════════════════════════════════════════════
 @app.post("/detect")
-async def start_detection():
+async def start_detection() -> JSONDict:
     """Start YOLO object detection in a background thread."""
     global detection_status, current_video_name
 
@@ -163,7 +249,7 @@ async def start_detection():
     if not video_name:
         # Fallback: pick the first video in input_video/
         video_files = [f for f in os.listdir(INPUT_DIR)
-                       if f.lower().endswith((".mp4", ".avi", ".mov", ".mkv", ".webm"))]
+                       if f.lower().endswith(tuple(ALLOWED_VIDEO_EXTENSIONS))]
         if not video_files:
             raise HTTPException(400, "No video found — upload a video first!")
         video_name = video_files[0]
@@ -200,7 +286,7 @@ async def start_detection():
 #  3. GET /detect/status — Poll detection status
 # ══════════════════════════════════════════════════════════
 @app.get("/detect/status")
-def get_detection_status():
+def get_detection_status() -> JSONDict:
     return detection_status
 
 
@@ -209,7 +295,7 @@ def get_detection_status():
 #     (Combined endpoint per user spec)
 # ══════════════════════════════════════════════════════════
 @app.post("/detect-video")
-async def detect_video(file: UploadFile = File(...)):
+async def detect_video(file: UploadFile = File(...)) -> JSONDict:
     """Accept a video file, run YOLO detection, save output, return video URL."""
     global detection_status, current_video_name
 
@@ -217,34 +303,34 @@ async def detect_video(file: UploadFile = File(...)):
         raise HTTPException(409, "Detection already in progress")
 
     # Validate file type
-    allowed = {".mp4", ".avi", ".mov", ".mkv", ".webm"}
-    ext = os.path.splitext(file.filename)[1].lower()
-    if ext not in allowed:
+    filename = get_upload_filename(file)
+    ext = os.path.splitext(filename)[1].lower()
+    if ext not in ALLOWED_VIDEO_EXTENSIONS:
         raise HTTPException(400, f"File type '{ext}' not allowed")
 
     # Save video
-    save_path = os.path.join(INPUT_DIR, file.filename)
+    save_path = os.path.join(INPUT_DIR, filename)
     with open(save_path, "wb") as f:
         shutil.copyfileobj(file.file, f)
 
-    current_video_name = file.filename
-    detection_status = {"status": "running", "message": f"Processing {file.filename}..."}
+    current_video_name = filename
+    detection_status = {"status": "running", "message": f"Processing {filename}..."}
 
     def run_in_background():
         global detection_status
         try:
             from tools.detect_objects import run_detection
-            result = run_detection(file.filename, db_directory=DB_DIR)
+            result = run_detection(filename, db_directory=DB_DIR)
 
             # Run environment prediction too
             try:
                 from tools.predict_environment import run_prediction_for_video
-                env = run_prediction_for_video(file.filename)
+                env = run_prediction_for_video(filename)
                 result += f" | Environment: {env}"
             except Exception:
                 pass
 
-            output_url = f"/output_video/detected_{file.filename}"
+            output_url = f"/output_video/detected_{filename}"
             detection_status = {
                 "status": "done",
                 "message": result,
@@ -256,16 +342,64 @@ async def detect_video(file: UploadFile = File(...)):
     threading.Thread(target=run_in_background, daemon=True).start()
     return {
         "status": "started",
-        "message": f"Detection running for {file.filename}",
+        "message": f"Detection running for {filename}",
         "poll_url": "/detect/status",
     }
+
+
+# ══════════════════════════════════════════════════════════
+#  4b. POST /detect-image — Run YOLO on a single image
+# ══════════════════════════════════════════════════════════
+@app.post("/detect-image")
+async def detect_image(file: UploadFile | None = File(None)) -> JSONDict:
+    """Run YOLO detection on an uploaded image. 
+    If no file is provided, uses the last uploaded image."""
+    global current_image_name
+
+    try:
+        if file:
+            filename = get_upload_filename(file)
+            ext = os.path.splitext(filename)[1].lower()
+            if ext not in ALLOWED_IMAGE_EXTENSIONS:
+                raise HTTPException(400, f"File type '{ext}' not allowed for image detection")
+            save_path = os.path.join(INPUT_DIR, filename)
+            with open(save_path, "wb") as f:
+                shutil.copyfileobj(file.file, f)
+            current_image_name = filename
+        else:
+            filename = current_image_name
+            if not filename:
+                raise HTTPException(400, "No image uploaded. Upload an image first.")
+
+        image_path = os.path.join(INPUT_DIR, filename)
+        if not os.path.exists(image_path):
+            raise HTTPException(400, f"Image '{filename}' not found")
+
+        # Run YOLO detection on the image
+        from tools.detect_objects import run_image_detection
+        result = run_image_detection(filename, db_directory=DB_DIR)
+
+        # Run environment prediction
+        try:
+            from tools.predict_environment import run_prediction_for_video
+            env = run_prediction_for_video(filename)
+            result["environment"] = env
+        except Exception:
+            pass
+
+        return result
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, str(e))
 
 
 # ══════════════════════════════════════════════════════════
 #  5. POST /predict-environment — Predict environment
 # ══════════════════════════════════════════════════════════
 @app.post("/predict-environment")
-async def predict_environment_endpoint(request: PredictRequest):
+async def predict_environment_endpoint(request: PredictRequest) -> JSONDict:
     """Predict the environment from detected objects.
     
     - If 'video_name' is provided, look up objects from the DB
@@ -302,8 +436,9 @@ async def predict_environment_endpoint(request: PredictRequest):
                 row = cur.fetchone()
                 conn.close()
                 if row:
-                    env = run_prediction_for_video(row[0])
-                    return {"video_name": row[0], "predicted_environment": env}
+                    latest_video = str(row[0])
+                    env = run_prediction_for_video(latest_video)
+                    return {"video_name": latest_video, "predicted_environment": env}
 
             raise HTTPException(400, "Provide 'video_name' or 'objects' list")
 
@@ -317,7 +452,7 @@ async def predict_environment_endpoint(request: PredictRequest):
 #  6. POST /chat — AI Chatbot
 # ══════════════════════════════════════════════════════════
 @app.post("/chat")
-async def chat(request: ChatRequest):
+async def chat(request: ChatRequest) -> JSONDict:
     """Send a message to AquaBot and get a response."""
     global bot
 
@@ -340,7 +475,7 @@ async def chat(request: ChatRequest):
 #  7. GET /output-video — Serve detected output video
 # ══════════════════════════════════════════════════════════
 @app.get("/output-video")
-def get_output_video():
+def get_output_video() -> FileResponse:
     """Serve the most recent detected output video."""
     # Find any detected_* file in output_video/
     output_files = glob.glob(os.path.join(OUTPUT_DIR, "detected_*"))
@@ -360,7 +495,7 @@ def get_output_video():
 #  8. GET /stats — Dashboard statistics from DB
 # ══════════════════════════════════════════════════════════
 @app.get("/stats")
-def get_stats():
+def get_stats() -> JSONDict:
     """Return detection statistics for the dashboard."""
     db_path = os.path.join(DB_DIR, "detections.db")
     if not os.path.exists(db_path):
@@ -375,30 +510,27 @@ def get_stats():
         conn = sqlite3.connect(db_path)
         cur = conn.cursor()
 
-        # Total per-frame detections
-        cur.execute("SELECT COUNT(*) FROM detections")
-        total = cur.fetchone()[0]
-
         # Unique object classes (e.g. "diver", "jellyfish")
         cur.execute("SELECT DISTINCT object_name FROM detections ORDER BY object_name")
-        unique_classes = [r[0] for r in cur.fetchall()]
+        unique_classes: ObjectList = [str(r[0]) for r in cur.fetchall()]
 
         # Unique TRACKED objects (e.g. "diver_1", "diver_2" = 2 unique divers)
         cur.execute("SELECT COUNT(DISTINCT object_label) FROM detections")
-        unique_tracked_count = cur.fetchone()[0]
+        tracked_row = cur.fetchone()
+        unique_tracked_count = int(tracked_row[0]) if tracked_row else 0
 
         # Per-class: count of unique tracked objects (NOT frame detections)
         cur.execute(
             "SELECT object_name, COUNT(DISTINCT object_label) as cnt FROM detections "
             "GROUP BY object_name ORDER BY cnt DESC LIMIT 10"
         )
-        top = [{"label": r[0], "count": r[1]} for r in cur.fetchall()]
+        top: list[JSONDict] = [{"label": str(r[0]), "count": int(r[1])} for r in cur.fetchall()]
 
         cur.execute(
             "SELECT activity, COUNT(*) as cnt FROM detections "
             "GROUP BY activity ORDER BY cnt DESC"
         )
-        activities = [{"label": r[0], "count": r[1]} for r in cur.fetchall()]
+        activities: list[JSONDict] = [{"label": str(r[0]), "count": int(r[1])} for r in cur.fetchall()]
 
         # Environment prediction
         env = None
@@ -406,8 +538,8 @@ def get_stats():
             cur.execute("SELECT predicted_environment FROM video_environments LIMIT 1")
             row = cur.fetchone()
             if row:
-                env = row[0]
-        except:
+                env = str(row[0])
+        except Exception:
             pass
 
         conn.close()
@@ -426,7 +558,7 @@ def get_stats():
 #  9. GET /download/{filename} — Download a specific output
 # ══════════════════════════════════════════════════════════
 @app.get("/download/{filename}")
-def download_output(filename: str):
+def download_output(filename: str) -> FileResponse:
     """Download a specific output video file."""
     if ".." in filename or filename.startswith(("/", "\\")):
         raise HTTPException(400, "Invalid filename")
